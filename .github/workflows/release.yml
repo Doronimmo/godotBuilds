@@ -120,14 +120,13 @@ jobs:
           mksquashfs "$BIN_NAME" \
             "godot_${VERSION}.${{ matrix.middle }}${SUFFIX}.squashfs" \
             -noappend \
-            -comp zstd \
+            -comp gzip \
             >/dev/null
           
           cat <<EOF > flags_${{ matrix.type }}_${{ matrix.arch }}.md
           ### SCons Flags: ${{ matrix.type }} (${{ matrix.arch }})
           \`\`\`bash
-          platform=linuxbsd arch=${{ matrix.scons_arch }} target=${{ matrix.target }} \\
-          ${{ matrix.flags }}
+          platform=linuxbsd arch=${{ matrix.scons_arch }} target=${{ matrix.target }} ${BASE_BUILD_FLAGS} ${{ matrix.flags }}
           \`\`\`
           EOF
           
