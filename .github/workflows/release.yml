@@ -18,11 +18,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        arch: [x86_64, aarch64]
+        type: [compat, optimised]
         include:
           - arch: x86_64
             scons_arch: x86_64
             runner: ubuntu-latest
-            type: compat
+          - arch: aarch64
+            scons_arch: arm64
+            runner: ubuntu-24.04-arm
+
+          - type: compat
             prefix: ""
             flags: "deprecated=yes minizip=yes disable_exceptions=yes \
               disable_rtti=yes module_basis_universal_enabled=yes \
@@ -30,10 +36,7 @@ jobs:
               module_text_server_advanced_enabled=yes module_gltf_enabled=no \
               module_gridmap_enabled=no module_openxr_enabled=no \
               module_raycast_enabled=no module_lightmapper_rd_enabled=no"
-          - arch: x86_64
-            scons_arch: x86_64
-            runner: ubuntu-latest
-            type: optimised
+          - type: optimised
             prefix: "optimised_"
             flags: "deprecated=no minizip=yes disable_3d=yes \
               disable_advanced_gui=yes disable_exceptions=yes \
@@ -43,30 +46,7 @@ jobs:
               module_gridmap_enabled=no module_msdfgen_enabled=no \
               module_openxr_enabled=no module_raycast_enabled=no \
               module_svg_enabled=no module_lightmapper_rd_enabled=no"
-          - arch: aarch64
-            scons_arch: arm64
-            runner: ubuntu-24.04-arm
-            type: compat
-            prefix: ""
-            flags: "deprecated=yes minizip=yes disable_exceptions=yes \
-              disable_rtti=yes module_basis_universal_enabled=yes \
-              module_msdfgen_enabled=yes module_svg_enabled=yes \
-              module_text_server_advanced_enabled=yes module_gltf_enabled=no \
-              module_gridmap_enabled=no module_openxr_enabled=no \
-              module_raycast_enabled=no module_lightmapper_rd_enabled=no"
-          - arch: aarch64
-            scons_arch: arm64
-            runner: ubuntu-24.04-arm
-            type: optimised
-            prefix: "optimised_"
-            flags: "deprecated=no minizip=yes disable_3d=yes \
-              disable_advanced_gui=yes disable_exceptions=yes \
-              disable_rtti=yes module_basis_universal_enabled=yes \
-              module_text_server_fallback_enabled=yes \
-              module_text_server_advanced_enabled=no module_gltf_enabled=no \
-              module_gridmap_enabled=no module_msdfgen_enabled=no \
-              module_openxr_enabled=no module_raycast_enabled=no \
-              module_svg_enabled=no module_lightmapper_rd_enabled=no"
+              
     runs-on: ${{ matrix.runner }}
     steps:
       - run: sudo apt-get update && sudo apt-get install -y squashfs-tools
