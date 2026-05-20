@@ -9,6 +9,13 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   SCONS_CACHE_LIMIT: 7168
+  BASE_BUILD_FLAGS: >
+    disable_path_overrides=no
+    optimize=speed
+    production=yes
+    lto=full
+    use_static_cpp=yes
+    openxr=no # safe to assume no one will miss it on PM ;]
 
 permissions:
   contents: write
@@ -31,19 +38,19 @@ jobs:
           - type: release
             target: template_release
             middle: ""
-            flags: "optimize=speed production=yes lto=full use_static_cpp=yes"
+            flags: ""
           - type: debug
             target: template_debug
             middle: "debug."
-            flags: "optimize=speed production=yes lto=full use_static_cpp=yes"
+            flags: ""
           - type: mono_release
             target: template_release
             middle: "mono."
-            flags: "module_mono_enabled=yes optimize=speed production=yes lto=full use_static_cpp=yes"
+            flags: "module_mono_enabled=yes"
           - type: mono_debug
             target: template_debug
             middle: "mono.debug."
-            flags: "module_mono_enabled=yes optimize=speed production=yes lto=full use_static_cpp=yes"
+            flags: "module_mono_enabled=yes"
               
     runs-on: ${{ matrix.runner }}
     steps:
@@ -59,10 +66,10 @@ jobs:
           ref: '${{ inputs.ref }}'
           path: godot_source
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         if: contains(matrix.type, 'mono')
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: 8.0.100
         
       - uses: actions/cache@v5
         with:
@@ -92,7 +99,7 @@ jobs:
             platform=linuxbsd \
             arch=${{ matrix.scons_arch }} \
             target=${{ matrix.target }} \
-            disable_path_overrides=no \
+            ${BASE_BUILD_FLAGS} \
             ${{ matrix.flags }}
           
           cd bin
