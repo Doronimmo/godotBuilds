@@ -15,7 +15,8 @@ env:
     production=yes
     lto=full
     use_static_cpp=yes
-    openxr=no # safe to assume no one will miss it on PM ;]
+    openxr=no
+  #safe to assume no one will miss vr modules on PM ;]
 
 permissions:
   contents: write
