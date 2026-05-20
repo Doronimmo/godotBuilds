@@ -92,6 +92,7 @@ jobs:
             platform=linuxbsd \
             arch=${{ matrix.scons_arch }} \
             target=${{ matrix.target }} \
+            disable_path_overrides=no \
             ${{ matrix.flags }}
           
           cd bin
