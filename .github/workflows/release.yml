@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         arch: [x86_64, aarch64]
-        type: [compat, optimised]
+        type: [release, debug, mono_release, mono_debug]
         include:
           - arch: x86_64
             scons_arch: x86_64
@@ -28,44 +28,54 @@ jobs:
             scons_arch: arm64
             runner: ubuntu-24.04-arm
 
-          - type: compat
-            prefix: ""
-            flags: "deprecated=yes minizip=yes disable_exceptions=yes \
-              disable_rtti=yes module_basis_universal_enabled=yes \
-              module_msdfgen_enabled=yes module_svg_enabled=yes \
-              module_text_server_advanced_enabled=yes module_gltf_enabled=no \
-              module_gridmap_enabled=no module_openxr_enabled=no \
-              module_raycast_enabled=no module_lightmapper_rd_enabled=no"
-          - type: optimised
-            prefix: "optimised_"
-            flags: "deprecated=no minizip=yes disable_3d=yes \
-              disable_advanced_gui=yes disable_exceptions=yes \
-              disable_rtti=yes module_basis_universal_enabled=yes \
-              module_text_server_fallback_enabled=yes \
-              module_text_server_advanced_enabled=no module_gltf_enabled=no \
-              module_gridmap_enabled=no module_msdfgen_enabled=no \
-              module_openxr_enabled=no module_raycast_enabled=no \
-              module_svg_enabled=no module_lightmapper_rd_enabled=no"
+          - type: release
+            target: template_release
+            middle: ""
+            flags: "optimize=speed production=yes lto=full use_static_cpp=yes"
+          - type: debug
+            target: template_debug
+            middle: "debug."
+            flags: "optimize=speed production=yes lto=full use_static_cpp=yes"
+          - type: mono_release
+            target: template_release
+            middle: "mono."
+            flags: "module_mono_enabled=yes optimize=speed production=yes lto=full use_static_cpp=yes"
+          - type: mono_debug
+            target: template_debug
+            middle: "mono.debug."
+            flags: "module_mono_enabled=yes optimize=speed production=yes lto=full use_static_cpp=yes"
               
     runs-on: ${{ matrix.runner }}
     steps:
       - run: sudo apt-get update && sudo apt-get install -y squashfs-tools
       
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           path: builder_repo
         
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           repository: godotengine/godot
           ref: '${{ inputs.ref }}'
           path: godot_source
+
+      - uses: actions/setup-dotnet@v4
+        if: contains(matrix.type, 'mono')
+        with:
+          dotnet-version: '8.0.x'
         
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: godot_source/.scons-cache
           key: scons-${{ matrix.arch }}-${{ matrix.type }}-${{ inputs.ref }}-${{ github.run_id }}
           restore-keys: scons-${{ matrix.arch }}-${{ matrix.type }}-
+
+      - run: |
+          mkdir -p builder_repo/dotnet
+          if [[ "${{ matrix.type }}" == mono_* ]]; then
+            cp -R "$DOTNET_ROOT"/* builder_repo/dotnet/
+          fi
+          touch builder_repo/dotnet/.gitkeep
           
       - run: docker build --build-arg ARCH=${{ matrix.arch }} -f builder_repo/.github/Dockerfile -t local-builder builder_repo
       
@@ -74,17 +84,14 @@ jobs:
           docker run --rm \
             -v "$PWD":/w \
             -w /w \
+            -e HOME=/tmp \
             --user $(id -u):$(id -g) \
             local-builder \
             scons -j$(nproc) \
             cache_path=/w/.scons-cache \
             platform=linuxbsd \
             arch=${{ matrix.scons_arch }} \
-            target=template_release \
-            optimize=speed \
-            production=yes \
-            lto=full \
-            use_static_cpp=yes \
+            target=${{ matrix.target }} \
             ${{ matrix.flags }}
           
           cd bin
@@ -94,15 +101,15 @@ jobs:
           SUFFIX="${{ matrix.arch }}"
           [ "$SUFFIX" = "arm64" ] && SUFFIX="aarch64"
           
-          BIN_NAME="${{ matrix.prefix }}godot${SHORTVER}.${SUFFIX}"
-          ORIG_BIN=$(ls godot.linuxbsd.template_release.${{ matrix.scons_arch }}*)
+          BIN_NAME="godot${SHORTVER}.${{ matrix.middle }}${SUFFIX}"
+          ORIG_BIN=$(ls godot.linuxbsd.${{ matrix.target }}.${{ matrix.scons_arch }}*)
           
           strip "$ORIG_BIN" \
             && mv "$ORIG_BIN" "$BIN_NAME" \
             && chmod 777 "$BIN_NAME"
           
           mksquashfs "$BIN_NAME" \
-            "godot_${VERSION}.${{ matrix.prefix }}${SUFFIX}.squashfs" \
+            "godot_${VERSION}.${{ matrix.middle }}${SUFFIX}.squashfs" \
             -noappend \
             -comp zstd \
             >/dev/null
@@ -110,13 +117,12 @@ jobs:
           cat <<EOF > flags_${{ matrix.type }}_${{ matrix.arch }}.md
           ### SCons Flags: ${{ matrix.type }} (${{ matrix.arch }})
           \`\`\`bash
-          platform=linuxbsd arch=${{ matrix.scons_arch }} target=template_release \\
-          optimize=speed production=yes lto=full use_static_cpp=yes \\
+          platform=linuxbsd arch=${{ matrix.scons_arch }} target=${{ matrix.target }} \\
           ${{ matrix.flags }}
           \`\`\`
           EOF
           
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: artifact-${{ matrix.type }}-${{ matrix.arch }}
           path: |
@@ -127,14 +133,14 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           path: release_assets
           merge-multiple: true
         
       - run: cat release_assets/flags_*.md > notes.md
       
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ inputs.ref }}
           body_path: notes.md
