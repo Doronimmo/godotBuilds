@@ -1,0 +1,110 @@
+name: Build Godot Release
+
+on:
+  push:
+    tags:
+      - '*-stable'
+      - 'v*'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  SCONS_CACHE_LIMIT: 7168
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  build_and_release:
+    name: Compile and Release
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout Builder
+        uses: actions/checkout@v5
+        with:
+          path: builder_repo
+
+      - name: Checkout Godot
+        uses: actions/checkout@v5
+        with:
+          repository: godotengine/godot
+          ref: ${{ github.ref_name }}
+          path: godot_source
+
+      - name: Create Cache
+        run: mkdir -p ${{ github.workspace }}/godot_source/.scons-cache
+
+      - name: Restore Cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ github.workspace }}/godot_source/.scons-cache
+          key: ${{ runner.os }}-scons-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-scons-${{ github.ref_name }}-
+            ${{ runner.os }}-scons-
+
+      - name: Build Image
+        run: |
+          cd builder_repo
+          docker build -f .github/Dockerfile -t local-builder .
+
+      - name: Compile Regular
+        run: |
+          cd godot_source
+          docker run --rm \
+            -v "$PWD":/workspace \
+            -w /workspace \
+            --user `id -u`:`id -g` \
+            local-builder \
+            scons -j`nproc` cache_path=/workspace/.scons-cache platform=linuxbsd arch=arm64 target=template_release optimize=speed production=yes lto=full disable_path_overrides=no use_static_cpp=yes tools=no deprecated=no minizip=yes module_lightmapper_rd_enabled=no disable_exceptions=yes disable_rtti=yes
+
+      - name: Prepare Regular
+        run: |
+          cd godot_source/bin/
+          strip godot.linuxbsd.template_release.arm64*
+          mv godot.linuxbsd.template_release.arm64* godot.aarch64
+
+      - name: Compile Compat
+        run: |
+          cd godot_source
+          docker run --rm \
+            -v "$PWD":/workspace \
+            -w /workspace \
+            --user `id -u`:`id -g` \
+            local-builder \
+            scons -j`nproc` cache_path=/workspace/.scons-cache platform=linuxbsd arch=arm64 target=template_release optimize=speed production=yes lto=full disable_path_overrides=no use_static_cpp=yes tools=no deprecated=no minizip=yes module_basis_universal_enabled=yes module_msdfgen_enabled=yes module_svg_enabled=yes module_text_server_advanced_enabled=yes module_gltf_enabled=no module_gridmap_enabled=no module_openxr_enabled=no module_raycast_enabled=no module_lightmapper_rd_enabled=no disable_exceptions=yes disable_rtti=yes
+
+      - name: Prepare Compat
+        run: |
+          cd godot_source/bin/
+          strip godot.linuxbsd.template_release.arm64*
+          mv godot.linuxbsd.template_release.arm64* godot_compat.aarch64
+
+      - name: Compile Optimised
+        run: |
+          cd godot_source
+          docker run --rm \
+            -v "$PWD":/workspace \
+            -w /workspace \
+            --user `id -u`:`id -g` \
+            local-builder \
+            scons -j`nproc` cache_path=/workspace/.scons-cache platform=linuxbsd arch=arm64 target=template_release optimize=speed production=yes lto=full disable_path_overrides=no use_static_cpp=yes tools=no disable_advanced_gui=yes deprecated=no minizip=yes module_basis_universal_enabled=yes module_gltf_enabled=no module_gridmap_enabled=no module_msdfgen_enabled=no module_openxr_enabled=no module_raycast_enabled=no module_svg_enabled=no module_lightmapper_rd_enabled=no module_text_server_advanced_enabled=no module_text_server_fallback_enabled=yes disable_3d=yes disable_exceptions=yes disable_rtti=yes
+
+      - name: Prepare Optimised
+        run: |
+          cd godot_source/bin/
+          strip godot.linuxbsd.template_release.arm64*
+          mv godot.linuxbsd.template_release.arm64* godot_optimised.aarch64
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Godot ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          files: |
+            godot_source/bin/godot.aarch64
+            godot_source/bin/godot_compat.aarch64
+            godot_source/bin/godot_optimised.aarch64
+          draft: false
+          prerelease: false
+          generate_release_notes: true
