@@ -16,7 +16,7 @@ env:
     production=yes
     lto=full
     use_static_cpp=yes
-    openxr=no
+    module_openxr_enabled=no
     vulkan=no
     module_mobile_vr_enabled=no
     module_webxr_enabled=no
