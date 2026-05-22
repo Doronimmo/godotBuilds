@@ -3,9 +3,9 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Godot tag (leave empty to rebuild all)'
+        description: 'Godot tag (eg. 4.6-stable) leave empty to rebuild all'
         required: false
-        default: '4.6-stable'
+        default: ''
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
