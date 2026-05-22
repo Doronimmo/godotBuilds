@@ -3,7 +3,8 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        required: true
+        description: 'Godot tag (leave empty to rebuild all)'
+        required: false
         default: '4.6-stable'
 
 env:
@@ -16,13 +17,40 @@ env:
     lto=full
     use_static_cpp=yes
     openxr=no
-  #safe to assume no one will miss vr modules on PM ;]
+    vulkan=no
+    module_mobile_vr_enabled=no
+    module_webxr_enabled=no
+  #safe to assume no one will miss vr/vulkan modules on PM ;]
 
 permissions:
   contents: write
-
+  actions: write
+  
 jobs:
+  dispatch_router:
+    if: inputs.ref == ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      
+      - name: Trigger workflows for all releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASES=$(gh release list --exclude-drafts | awk '{print $1}')
+          
+          if [ -z "$RELEASES" ]; then
+            echo "No releases found to rebuild."
+            exit 0
+          fi
+          
+          for TAG in $RELEASES; do
+            echo "Dispatching build for release: $TAG"
+            gh workflow run "${{ github.workflow }}" -f ref="$TAG"
+            sleep 2
+          done
   build:
+    if: inputs.ref != ''
     strategy:
       fail-fast: false
       matrix:
@@ -148,8 +176,9 @@ jobs:
         
       - run: cat release_assets/flags_*.md > notes.md
       
-      - uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ inputs.ref }}
-          body_path: notes.md
-          files: release_assets/*.squashfs
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ inputs.ref }}" --title "${{ inputs.ref }}" --notes-file notes.md || true
+          gh release edit "${{ inputs.ref }}" --notes-file notes.md
+          gh release upload "${{ inputs.ref }}" release_assets/*.squashfs --clobber
