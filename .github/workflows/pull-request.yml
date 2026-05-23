@@ -60,7 +60,6 @@ jobs:
               if $i then ($e[0:$i+1] + $n + $e[$i+1:]) else ($e + $n) end |
               from_entries
             ' runtimes/runtimes.json > tmp.json && mv tmp.json runtimes/runtimes.json
-            sed -i 's/": {/":  {/g' runtimes/runtimes.json
           fi
           
           git config user.name "github-actions[bot]"
