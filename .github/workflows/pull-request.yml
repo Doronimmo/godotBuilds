@@ -27,7 +27,7 @@ jobs:
           BASE: ${{ inputs.target_branch }}
         run: |
           mkdir -p new_runtimes
-          gh release download "$TAG" --repo "${{ github.repository }}" --pattern "*.squashfs" --dir new_runtimes
+          GH_TOKEN=${{ github.token }} gh release download "$TAG" --repo "${{ github.repository }}" --pattern "*.squashfs" --dir new_runtimes
           find new_runtimes -type f -name "*debug*.squashfs" -delete
 
           git clone --filter=blob:none --no-checkout "https://x-access-token:${GH_TOKEN}@github.com/${TARGET}.git" repo
