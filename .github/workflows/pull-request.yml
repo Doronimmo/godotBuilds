@@ -1,0 +1,63 @@
+name: PR Runtimes to Target Fork
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag'
+        required: true
+      target_repo:
+        description: 'Target repo'
+        required: true
+      target_branch:
+        description: 'Base branch'
+        required: true
+        default: 'main'
+
+jobs:
+  sparse_checkout_pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch, Sparse Checkout, and PR
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          TAG: ${{ inputs.tag }}
+          TARGET: ${{ inputs.target_repo }}
+          BRANCH: update-godot-runtimes-${{ inputs.tag }}
+          BASE: ${{ inputs.target_branch }}
+        run: |
+          mkdir -p new_runtimes
+          gh release download "$TAG" --repo "${{ github.repository }}" --pattern "*.squashfs" --dir new_runtimes
+          find new_runtimes -type f -name "*debug*.squashfs" -delete
+
+          git clone --filter=blob:none --no-checkout "https://x-access-token:${GH_TOKEN}@github.com/${TARGET}.git" repo
+          cd repo
+          
+          git sparse-checkout init
+          echo -e "/tools/\n/SOURCE_SETUP.txt\n/README.md\n/.gitignore\n/runtimes/" > .git/info/sparse-checkout
+          
+          if git ls-remote --heads origin "$BRANCH" | grep -q "$BRANCH"; then
+              git fetch origin "$BRANCH" && git checkout "$BRANCH"
+          else
+              git fetch origin "$BASE" && git checkout -b "$BRANCH" origin/"$BASE"
+          fi
+          
+          git checkout
+
+          mkdir -p runtimes
+          mv ../new_runtimes/*.squashfs runtimes/
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add runtimes/*.squashfs
+          
+          if git diff --staged --quiet; then
+            exit 0
+          fi
+          
+          git commit -m "Add $TAG runtimes "
+          git push -u origin "$BRANCH"
+          
+          gh pr create --repo "$TARGET" --base "$BASE" --head "$BRANCH" \
+            --title "Add $TAG runtimes " \
+            --body "Automated PR. Adds runtimes for $TAG." || true
