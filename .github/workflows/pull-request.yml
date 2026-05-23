@@ -46,18 +46,33 @@ jobs:
 
           mkdir -p runtimes
           mv ../new_runtimes/*.squashfs runtimes/
+
+          VERSION=$(echo "$TAG" | sed 's/-stable//')
+          if [ -f runtimes/runtimes.json ]; then
+            jq --arg ver "$VERSION" '
+              del(.["godot_" + $ver + ".squashfs"], .["godot_" + $ver + ".mono.squashfs"]) |
+              to_entries as $e |
+              ($e | map(.key | startswith("godot_")) | rindex(true)) as $i |
+              [
+                {"key": ("godot_" + $ver + ".squashfs"), "value": {"name": ("Godot " + $ver), "default": "aarch64", "arch": {"aarch64": ("godot_" + $ver + ".aarch64.squashfs"), "x86_64": ("godot_" + $ver + ".x86_64.squashfs")}}},
+                {"key": ("godot_" + $ver + ".mono.squashfs"), "value": {"name": ("Godot " + $ver + " Mono"), "default": "aarch64", "arch": {"aarch64": ("godot_" + $ver + ".mono.aarch64.squashfs"), "x86_64": ("godot_" + $ver + ".mono.x86_64.squashfs")}}}
+              ] as $n |
+              if $i then ($e[0:$i+1] + $n + $e[$i+1:]) else ($e + $n) end |
+              from_entries
+            ' runtimes/runtimes.json > tmp.json && mv tmp.json runtimes/runtimes.json
+          fi
           
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add runtimes/*.squashfs
+          git add runtimes/
           
           if git diff --staged --quiet; then
             exit 0
           fi
           
-          git commit -m "Add $TAG runtimes "
+          git commit -m "Add $TAG runtimes and update json"
           git push -u origin "$BRANCH"
           
           gh pr create --repo "$TARGET" --base "$BASE" --head "$BRANCH" \
-            --title "Add $TAG runtimes " \
-            --body "Automated PR. Adds runtimes for $TAG." || true
+            --title "Add $TAG runtimes" \
+            --body "Automated PR. Adds runtimes and updates json for $TAG." || true
