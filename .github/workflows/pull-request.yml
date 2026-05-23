@@ -49,7 +49,7 @@ jobs:
 
           VERSION=$(echo "$TAG" | sed 's/-stable//')
           if [ -f runtimes/runtimes.json ]; then
-            jq --arg ver "$VERSION" '
+            jq --indent 4 --arg ver "$VERSION" '
               del(.["godot_" + $ver + ".squashfs"], .["godot_" + $ver + ".mono.squashfs"]) |
               to_entries as $e |
               ($e | map(.key | startswith("godot_")) | rindex(true)) as $i |
