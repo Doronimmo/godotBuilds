@@ -6,6 +6,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v6
+        with:
+          path: builder_repo
       - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -15,9 +18,10 @@ jobs:
           sudo debootstrap --arch=arm64 --foreign disco /c http://old-releases.ubuntu.com/ubuntu/
           sudo cp /usr/bin/qemu-aarch64-static /c/usr/bin/
           sudo chroot /c /debootstrap/debootstrap --second-stage
+          cd builder_repo
           E=0
-          for T in $(gh release list --limit 100 | awk '{print $1}'); do
-            gh release download "$T" --pattern "*aarch64.squashfs" 2>/dev/null || continue
+          for T in $(gh release list --repo $GITHUB_REPOSITORY --limit 100 | awk '{print $1}'); do
+            gh release download "$T" --repo $GITHUB_REPOSITORY --pattern "*aarch64.squashfs" 2>/dev/null || continue
             S=$(ls *.squashfs 2>/dev/null)
             [ -z "$S" ] && continue
             unsquashfs -f -d ex "$S" >/dev/null 2>&1
