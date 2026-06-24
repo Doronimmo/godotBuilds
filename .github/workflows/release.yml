@@ -60,9 +60,13 @@ jobs:
           - arch: x86_64
             scons_arch: x86_64
             runner: ubuntu-latest
+            zig_arch: x86_64
+            zig_target: x86_64-linux-gnu.2.29
           - arch: aarch64
             scons_arch: arm64
             runner: ubuntu-24.04-arm
+            zig_arch: aarch64
+            zig_target: aarch64-linux-gnu.2.29
 
           - type: release
             target: template_release
@@ -100,7 +104,7 @@ jobs:
           docker builder prune -af || true
           df -h
       
-      - run: sudo apt-get update && sudo apt-get install -y squashfs-tools
+      - run: sudo apt-get update && sudo apt-get install -y squashfs-tools xz-utils
       
       - uses: actions/checkout@v6
         with:
@@ -111,7 +115,14 @@ jobs:
           repository: godotengine/godot
           ref: '${{ inputs.ref }}'
           path: godot_source
-
+      
+      - name: Download and Setup Zig Compiler for GLIBC Downgrade
+        run: |
+          cd godot_source
+          wget -q https://ziglang.org/download/0.13.0/zig-linux-${{ matrix.zig_arch }}-0.13.0.tar.xz
+          tar -xf zig-linux-${{ matrix.zig_arch }}-0.13.0.tar.xz
+          mv zig-linux-${{ matrix.zig_arch }}-0.13.0 zig_bin
+        
       - uses: actions/setup-dotnet@v5
         if: contains(matrix.type, 'mono')
         with:
@@ -139,12 +150,16 @@ jobs:
             -w /w \
             -e HOME=/tmp \
             --user $(id -u):$(id -g) \
+            -e CC="/w/zig_bin/zig cc" \
+            -e CXX="/w/zig_bin/zig c++" \
             local-builder \
             scons -j$(nproc) \
             cache_path=/w/.scons-cache \
             platform=linuxbsd \
             arch=${{ matrix.scons_arch }} \
             target=${{ matrix.target }} \
+            extra_cflags="-target ${{ matrix.zig_target }}" \
+            extra_cxxflags="-target ${{ matrix.zig_target }}" \
             ${BASE_BUILD_FLAGS} \
             ${{ matrix.flags }}
           
