@@ -90,6 +90,9 @@ jobs:
               continue
             fi
 
+            MAX_GLIBC=$(find ex -type f \( -name "*.so" -o -name "*.so.*" -o -executable \) -exec strings {} + 2>/dev/null | grep "^GLIBC_2" | sed "s/GLIBC_//g" | sort --version-sort | uniq | tail -n 1 || echo "None found")
+            echo "Highest GLIBC required: $MAX_GLIBC"
+            
             B=$(find ex -type f -executable | head -n 1)
             if [ -n "$B" ]; then
               echo "Found executable: $B"
