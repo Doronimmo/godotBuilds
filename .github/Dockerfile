@@ -1,7 +1,7 @@
 ARG ARCH=aarch64
 FROM ghcr.io/monkeyx-net/portmaster-build-templates/portmaster-builder:${ARCH}-latest
 USER root
-RUN add-apt-repository ppa:deadsnakes/ppa -y
+RUN apt-get update && apt-get install software-properties-common && add-apt-repository ppa:deadsnakes/ppa -y
 RUN apt-get update && apt-get install -y \
     libwayland-bin \
     python3.11 \
