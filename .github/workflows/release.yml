@@ -144,6 +144,22 @@ jobs:
       - run: docker build --build-arg ARCH=${{ matrix.arch }} -f builder_repo/.github/Dockerfile -t local-builder builder_repo
       
       - run: |
+          cat << 'EOF' > ext.Dockerfile
+          FROM local-builder
+          USER root
+          ENV DEBIAN_FRONTEND=noninteractive
+          RUN apt-get update && apt-get install -y --no-install-recommends software-properties-common \
+              && add-apt-repository ppa:deadsnakes/ppa -y \
+              && apt-get update \
+              && apt-get install -y --no-install-recommends python3.11 python3.11-venv python3.11-distutils \
+              && python3.11 -m ensurepip --upgrade \
+              && python3.11 -m pip install --no-cache-dir scons==4.7.0 \
+              && apt-get purge -y software-properties-common \
+              && apt-get autoremove -y
+          EOF
+          docker build -t local-builder -f ext.Dockerfile .
+      
+      - run: |
           cd godot_source
           docker run --rm \
             -v "$PWD":/w \
