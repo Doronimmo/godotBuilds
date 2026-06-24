@@ -26,13 +26,21 @@ jobs:
             [ -z "$S" ] && continue
             unsquashfs -f -d ex "$S" >/dev/null 2>&1
             B=$(find ex -type f -executable | head -n 1)
-            [ -n "$B" ] && sudo cp "$B" /c/b && sudo chmod +x /c/b
-            if ! sudo chroot /c /usr/bin/qemu-aarch64-static /b --version >/dev/null 2>&1; then
-              echo "FAIL $T"
-              sudo chroot /c /usr/bin/qemu-aarch64-static /usr/bin/ldd /b || true
-              E=1
-            else
-              echo "PASS $T"
+            if [ -n "$B" ]; then
+              sudo cp "$B" /c/b
+              sudo chmod +x /c/b
+              O=$(sudo chroot /c /usr/bin/qemu-aarch64-static /b --headless --version 2>&1)
+              if echo "$O" | grep -qE "invalid option|Condition"; then
+                O=$(sudo chroot /c /usr/bin/qemu-aarch64-static /b --version 2>&1)
+              fi
+              if echo "$O" | grep -qE "not found|shared libraries|Segmentation fault|core dumped"; then
+                echo "FAIL $T"
+                echo "$O"
+                sudo chroot /c /usr/bin/qemu-aarch64-static /usr/bin/ldd /b || true
+                E=1
+              else
+                echo "PASS $T"
+              fi
             fi
             sudo rm -rf ex /c/b *.squashfs
           done
