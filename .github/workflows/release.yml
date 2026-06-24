@@ -61,12 +61,12 @@ jobs:
             scons_arch: x86_64
             runner: ubuntu-latest
             zig_arch: x86_64
-            zig_target: x86_64-linux-gnu.2.29
+            zig_target: x86_64-linux-gnu.2.28
           - arch: aarch64
             scons_arch: arm64
             runner: ubuntu-24.04-arm
             zig_arch: aarch64
-            zig_target: aarch64-linux-gnu.2.29
+            zig_target: aarch64-linux-gnu.2.28
 
           - type: release
             target: template_release
