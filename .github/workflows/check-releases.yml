@@ -15,7 +15,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y squashfs-tools debootstrap qemu-user-static
           sudo mkdir -p /c
-          sudo debootstrap --arch=arm64 --foreign disco /c http://old-releases.ubuntu.com/ubuntu/
+          sudo debootstrap --variant=minbase --arch=arm64 --foreign disco /c http://old-releases.ubuntu.com/ubuntu/
           sudo cp /usr/bin/qemu-aarch64-static /c/usr/bin/
           sudo chroot /c /debootstrap/debootstrap --second-stage
           cd builder_repo
