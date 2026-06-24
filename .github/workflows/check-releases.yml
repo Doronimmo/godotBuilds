@@ -1,96 +1,35 @@
-name: Check Releases Ubuntu 19 Chroot
-on:
-  workflow_dispatch:
-
+name: Check Releases Ubuntu 19.04
+on: workflow_dispatch
 permissions:
   contents: read
-
 jobs:
-  chroot-test-aarch64:
+  test:
     runs-on: ubuntu-latest
     steps:
-      - name: Install Extraction and Emulation Tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y squashfs-tools qemu-user-static wget
-
-      - name: Build Ubuntu 19.10 aarch64 Chroot Environment
-        run: |
-          # Create baseline directory structure
-          sudo mkdir -p /chroot/u19
-          
-          # Fetch the official end-of-life core rootfs tarball for Ubuntu 19.10 ARM64
-          wget -q http://old-releases.ubuntu.com/ubuntu-base/releases/19.10/release/ubuntu-base-19.10-base-arm64.tar.gz
-          
-          # Unpack the filesystem into the target folder
-          sudo tar -xzf ubuntu-base-19.10-base-arm64.tar.gz -C /chroot/u19
-          
-          # Copy the static QEMU ARM binary into the chroot to allow x86_64 execution translation
-          sudo cp /usr/bin/qemu-aarch64-static /chroot/u19/usr/bin/
-
-      - name: Download and Verify All Release Binaries
-        env:
+      - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          RELEASES=$(gh release list --limit 100 | awk '{print $1}')
-
-          if [ -z "$RELEASES" ]; then
-            echo "No releases found."
-            exit 0
-          fi
-
-          FAILED_BUILDS=0
-
-          for TAG in $RELEASES; do
-            echo "=== Testing Release: $TAG ==="
-            mkdir -p "test_${TAG}" && cd "test_${TAG}"
-
-            # Grab only the aarch64 squashfs release file
-            gh release download "$TAG" --pattern "*aarch64.squashfs" || true
-
-            if [ ! -f *.squashfs ]; then
-              echo "No aarch64 squashfs asset found for $TAG. Skipping."
-              cd .. && rm -rf "test_${TAG}"
-              continue
-            fi
-
-            SQUASH_FILE=$(ls *.squashfs)
-            unsquashfs -d extracted "$SQUASH_FILE" >/dev/null 2>&1
-
-            BIN_FILE=$(find extracted -type f -executable | head -n 1)
-
-            if [ -z "$BIN_FILE" ]; then
-              echo "Error: No executable binary discovered inside $SQUASH_FILE"
-              FAILED_BUILDS=$((FAILED_BUILDS + 1))
-              cd .. && rm -rf "test_${TAG}"
-              continue
-            fi
-
-            # Inject target binary directly into the environment path of the rootfs folder
-            sudo cp "$BIN_FILE" /chroot/u19/test_bin
-            sudo chmod +x /chroot/u19/test_bin
-
-            # Execute the runtime container validation test using the emulator inside the chroot
-            if sudo chroot /chroot/u19 /usr/bin/qemu-aarch64-static /test_bin --version >/dev/null 2>&1; then
-              echo "PASS: $SQUASH_FILE launched cleanly in the Ubuntu 19 chroot environment."
+          sudo apt-get update
+          sudo apt-get install -y squashfs-tools debootstrap qemu-user-static
+          sudo mkdir -p /c
+          sudo debootstrap --arch=arm64 --foreign disco /c http://old-releases.ubuntu.com/ubuntu/
+          sudo cp /usr/bin/qemu-aarch64-static /c/usr/bin/
+          sudo chroot /c /debootstrap/debootstrap --second-stage
+          E=0
+          for T in $(gh release list --limit 100 | awk '{print $1}'); do
+            gh release download "$T" --pattern "*aarch64.squashfs" 2>/dev/null || continue
+            S=$(ls *.squashfs 2>/dev/null)
+            [ -z "$S" ] && continue
+            unsquashfs -f -d ex "$S" >/dev/null 2>&1
+            B=$(find ex -type f -executable | head -n 1)
+            [ -n "$B" ] && sudo cp "$B" /c/b && sudo chmod +x /c/b
+            if ! sudo chroot /c /usr/bin/qemu-aarch64-static /b --version >/dev/null 2>&1; then
+              echo "FAIL $T"
+              sudo chroot /c /usr/bin/qemu-aarch64-static /usr/bin/ldd /b || true
+              E=1
             else
-              echo "FAIL: $SQUASH_FILE aborted execution in the Ubuntu 19 chroot environment."
-              echo "--- Linker Dependencies and Symbol Mapping Output ---"
-              
-              # Print internal dependency tracking paths inside the chroot to pinpoint errors
-              sudo chroot /chroot/u19 /usr/bin/qemu-aarch64-static /usr/bin/ldd /test_bin || true
-              FAILED_BUILDS=$((FAILED_BUILDS + 1))
+              echo "PASS $T"
             fi
-
-            # Clean target binary out of the chroot context before testing next loop item
-            sudo rm -f /chroot/u19/test_bin
-            cd .. && rm -rf "test_${TAG}"
-            echo ""
+            sudo rm -rf ex /c/b *.squashfs
           done
-
-          if [ $FAILED_BUILDS -gt 0 ]; then
-            echo "Verification complete: $FAILED_BUILDS assets failed the runtime check."
-            exit 1
-          fi
-
-          echo "Verification complete: All assets are completely compatible."
+          exit $E
