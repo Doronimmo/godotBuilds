@@ -1,7 +1,9 @@
 name: Check Releases Ubuntu 19.04
 on: workflow_dispatch
+
 permissions:
   contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -9,57 +11,115 @@ jobs:
       - uses: actions/checkout@v6
         with:
           path: builder_repo
-      
-      - name: Aggressive cleanup # Snatched this from some medium post
+
+      - name: Aggressive cleanup
         run: |
-          sudo rm -rf /usr/lib/jvm
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/share/swift
-          sudo rm -rf /usr/local/.ghcup
-          sudo rm -rf /usr/local/julia*
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /usr/local/share/chromium
-          sudo rm -rf /opt/microsoft /opt/google
-          sudo rm -rf /opt/az
-          sudo rm -rf /usr/local/share/powershell
-          sudo rm -rf /opt/hostedtoolcache
+          set -x
+          sudo rm -rf /usr/lib/jvm /usr/share/dotnet /usr/share/swift
+          sudo rm -rf /usr/local/.ghcup /usr/local/julia* /usr/local/lib/android
+          sudo rm -rf /usr/local/share/chromium /opt/microsoft /opt/google
+          sudo rm -rf /opt/az /usr/local/share/powershell /opt/hostedtoolcache
           docker system prune -af || true
           docker builder prune -af || true
           df -h
 
-      - env:
+      - name: Setup Environment and Test Releases
+        env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
+
+          echo "::group::System Dependencies Setup"
           sudo apt-get update
           sudo apt-get install -y squashfs-tools debootstrap qemu-user-static
+          echo "::endgroup::"
+
+          echo "::group::Debootstrap (Stage 1 - Download)"
           sudo mkdir -p /c
-          sudo debootstrap --variant=minbase --arch=arm64 --foreign disco /c http://old-releases.ubuntu.com/ubuntu/
+          n=0
+          until [ "$n" -ge 3 ]; do
+            if sudo debootstrap --verbose --variant=minbase --arch=arm64 --foreign disco /c http://old-releases.ubuntu.com/ubuntu/; then
+              break
+            fi
+            n=$((n+1))
+            echo "::warning::Debootstrap failed, retrying in 10 seconds... ($n/3)"
+            sleep 10
+          done
+          if [ "$n" -ge 3 ]; then
+            echo "::error::Debootstrap Stage 1 failed after 3 attempts."
+            exit 1
+          fi
+          echo "::endgroup::"
+
+          echo "::group::Debootstrap (Stage 2 - Install)"
           sudo cp /usr/bin/qemu-aarch64-static /c/usr/bin/
           sudo chroot /c /debootstrap/debootstrap --second-stage
+          echo "::endgroup::"
+
           cd builder_repo
           E=0
-          for T in $(gh release list --repo $GITHUB_REPOSITORY --limit 100 | awk '{print $1}'); do
-            gh release download "$T" --repo $GITHUB_REPOSITORY --pattern "*aarch64.squashfs" 2>/dev/null || continue
-            S=$(ls *.squashfs 2>/dev/null)
-            [ -z "$S" ] && continue
-            unsquashfs -f -d ex "$S" >/dev/null 2>&1
+
+          echo "::group::Fetching Releases List"
+          readarray -t RELEASES < <(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 | awk '{print $1}')
+          echo "Found ${#RELEASES[@]} releases to check."
+          echo "::endgroup::"
+
+          for T in "${RELEASES[@]}"; do
+            echo "::group::Testing Release: $T"
+            
+            if ! gh release download "$T" --repo "$GITHUB_REPOSITORY" --pattern "*aarch64.squashfs" > download_log.txt 2>&1; then
+              echo "Skipping $T: No *aarch64.squashfs found or download failed."
+              cat download_log.txt
+              echo "::endgroup::"
+              continue
+            fi
+
+            S=$(find . -maxdepth 1 -name "*aarch64.squashfs" | head -n 1)
+            if [ -z "$S" ]; then
+              echo "Skipping $T: File not found locally after download."
+              echo "::endgroup::"
+              continue
+            fi
+
+            echo "Extracting $S..."
+            if ! unsquashfs -f -d ex "$S"; then
+              echo "::error::Failed to extract $S"
+              E=1
+              sudo rm -rf ex "$S" download_log.txt
+              echo "::endgroup::"
+              continue
+            fi
+
             B=$(find ex -type f -executable | head -n 1)
             if [ -n "$B" ]; then
+              echo "Found executable: $B"
               sudo cp "$B" /c/b
               sudo chmod +x /c/b
-              O=$(sudo chroot /c /usr/bin/qemu-aarch64-static /b --headless --version 2>&1)
+              
+              echo "Running execution test..."
+              O=$(sudo chroot /c /usr/bin/qemu-aarch64-static /b --headless --version 2>&1 || true)
+              
               if echo "$O" | grep -qE "invalid option|Condition"; then
-                O=$(sudo chroot /c /usr/bin/qemu-aarch64-static /b --version 2>&1)
+                O=$(sudo chroot /c /usr/bin/qemu-aarch64-static /b --version 2>&1 || true)
               fi
+              
               if echo "$O" | grep -qE "not found|shared libraries|Segmentation fault|core dumped"; then
-                echo "FAIL $T"
+                echo "::error::FAIL $T"
+                echo "Binary Output:"
                 echo "$O"
+                echo "--- ldd analysis ---"
                 sudo chroot /c /usr/bin/qemu-aarch64-static /usr/bin/ldd /b || true
                 E=1
               else
                 echo "PASS $T"
+                echo "Output: $O"
               fi
+            else
+              echo "Skipping $T: No executable found inside the squashfs image."
             fi
-            sudo rm -rf ex /c/b *.squashfs
+
+            sudo rm -rf ex /c/b *.squashfs download_log.txt
+            echo "::endgroup::"
           done
+
           exit $E
