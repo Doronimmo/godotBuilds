@@ -6,9 +6,11 @@ RUN apt-get update && apt-get install -y libwayland-bin && rm -rf /var/lib/apt/l
 COPY deps/ /tmp/deps/
 RUN if [ "$ARCH" = "aarch64" ]; then \
         mv /tmp/deps/python3.11 /opt/python3.11 \
-        && sed -i 's|#!/usr/bin/env python3|#!/opt/python3.11/bin/python3|' /opt/python3.11/bin/pip* \
-        && /opt/python3.11/bin/pip3 install --upgrade pip \
-        && (/opt/python3.11/bin/pip3 install --break-system-packages scons || /opt/python3.11/bin/pip3 install scons); \
+        && rm -f /opt/python3.11/pyvenv.cfg \
+        && PYTHONHOME=/opt/python3.11 /opt/python3.11/bin/python3 -m ensurepip --upgrade \
+        && PYTHONHOME=/opt/python3.11 /opt/python3.11/bin/python3 -m pip install --upgrade pip \
+        && (PYTHONHOME=/opt/python3.11 /opt/python3.11/bin/python3 -m pip install --break-system-packages scons \
+            || PYTHONHOME=/opt/python3.11 /opt/python3.11/bin/python3 -m pip install scons); \
     else \
         apt-get update && apt-get install -y software-properties-common && add-apt-repository ppa:deadsnakes/ppa -y \
         && apt-get update && apt-get install -y python3.11 python3.11-venv python3.11-distutils && rm -rf /var/lib/apt/lists/* \
