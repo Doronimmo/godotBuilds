@@ -1,5 +1,6 @@
 ARG ARCH=aarch64
 FROM ghcr.io/monkeyx-net/portmaster-build-templates/portmaster-builder:${ARCH}-latest
+ARG ARCH
 USER root
 RUN apt-get update && apt-get install -y libwayland-bin && rm -rf /var/lib/apt/lists/*
 COPY deps/ /tmp/deps/
