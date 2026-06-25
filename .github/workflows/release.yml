@@ -179,6 +179,7 @@ jobs:
             extra_cxxflags="-target ${{ matrix.zig_target }}" \
             extra_linkflags="-fuse-ld=mold" \
             ${BASE_BUILD_FLAGS} \
+            use_llvm=yes \
             ${{ matrix.flags }}
           
           cd bin
