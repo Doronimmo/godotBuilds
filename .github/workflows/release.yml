@@ -135,9 +135,9 @@ jobs:
       - name: Download and Setup Zig Compiler for GLIBC Downgrade
         run: |
           cd godot_source
-          wget -q https://ziglang.org/download/0.16.0/zig-linux-${{ matrix.arch }}-0.16.0.tar.xz
-          tar -xf zig-linux-${{ matrix.arch }}-0.16.0.tar.xz
-          mv zig-linux-${{ matrix.arch }}-0.16.0 zig_bin
+          wget -q https://ziglang.org/download/0.16.0/zig-${{ matrix.arch }}-linux-0.16.0.tar.xz
+          tar -xf zig-${{ matrix.arch }}-linux-0.16.0.tar.xz
+          mv zig-${{ matrix.arch }}-linux-0.16.0 zig_bin
         
       - uses: actions/setup-dotnet@v5
         if: contains(matrix.type, 'mono')
