@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y libwayland-bin && rm -rf /var/lib/apt/l
 COPY deps/ /tmp/deps/
 RUN if [ "$ARCH" = "aarch64" ]; then \
         mv /tmp/deps/python3.11 /opt/python3.11 \
+        && sed -i 's|#!/usr/bin/env python3|#!/opt/python3.11/bin/python3|' /opt/python3.11/bin/pip* \
         && /opt/python3.11/bin/pip3 install --upgrade pip \
         && (/opt/python3.11/bin/pip3 install --break-system-packages scons || /opt/python3.11/bin/pip3 install scons); \
     else \
