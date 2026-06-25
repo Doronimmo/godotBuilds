@@ -161,6 +161,12 @@ jobs:
             
       - run: |
           cd godot_source
+          mkdir -p zig_wrappers
+          echo '#!/usr/bin/env bash' > zig_wrappers/clang
+          echo 'env ZIG_LOCAL_CACHE_DIR=/w/.zig-cache ZIG_GLOBAL_CACHE_DIR=/w/.zig-global-cache /w/zig_bin/zig cc "$@"' >> zig_wrappers/clang
+          echo '#!/usr/bin/env bash' > zig_wrappers/clang++
+          echo 'env ZIG_LOCAL_CACHE_DIR=/w/.zig-cache ZIG_GLOBAL_CACHE_DIR=/w/.zig-global-cache /w/zig_bin/zig c++ "$@"' >> zig_wrappers/clang++
+          chmod +x zig_wrappers/clang zig_wrappers/clang++
           docker run --rm \
             -v "$PWD":/w \
             -w /w \
@@ -169,8 +175,8 @@ jobs:
             ${{ matrix.docker_env }} \
             local-builder \
             ${{ matrix.scons_cmd }} -j$(nproc) \
-            CC="env ZIG_LOCAL_CACHE_DIR=/w/.zig-cache ZIG_GLOBAL_CACHE_DIR=/w/.zig-global-cache /w/zig_bin/zig cc" \
-            CXX="env ZIG_LOCAL_CACHE_DIR=/w/.zig-cache ZIG_GLOBAL_CACHE_DIR=/w/.zig-global-cache /w/zig_bin/zig c++" \
+            CC="/w/zig_wrappers/clang" \
+            CXX="/w/zig_wrappers/clang++" \
             cache_path=/w/.scons-cache \
             platform=linuxbsd \
             arch=${{ matrix.scons_arch }} \
@@ -179,7 +185,6 @@ jobs:
             extra_cxxflags="-target ${{ matrix.zig_target }}" \
             extra_linkflags="-fuse-ld=mold" \
             ${BASE_BUILD_FLAGS} \
-            use_llvm=yes \
             ${{ matrix.flags }}
           
           cd bin
