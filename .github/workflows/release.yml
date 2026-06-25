@@ -77,7 +77,7 @@ jobs:
           - type: debug
             target: template_debug
             middle: "debug."
-            flags: "lto=thin"
+            flags: "lto=none"
           - type: mono_release
             target: template_release
             middle: "mono."
@@ -85,7 +85,7 @@ jobs:
           - type: mono_debug
             target: template_debug
             middle: "mono.debug."
-            flags: "lto=thin module_mono_enabled=yes"
+            flags: "lto=none module_mono_enabled=yes"
               
     runs-on: ${{ matrix.runner }}
     steps:
