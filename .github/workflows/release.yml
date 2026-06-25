@@ -109,6 +109,10 @@ jobs:
       - uses: actions/checkout@v6
         with:
           path: builder_repo
+      
+      - if: matrix.arch == 'aarch64'
+        run: |
+          unsquashfs -d builder_repo/deps/python3.11 builder_repo/deps/python_3.11.aarch64.squashfs
         
       - uses: actions/checkout@v6
         with:

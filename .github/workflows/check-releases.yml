@@ -74,19 +74,19 @@ jobs:
               continue
             fi
 
-            S=$(find . -maxdepth 1 -name "*aarch64.squashfs" | head -n 1)
-            if [ -z "$S" ]; then
+            readarray -t ASSETS < <(find . -maxdepth 1 -name "*aarch64.squashfs")
+            if [ ${#ASSETS[@]} -eq 0 ]; then
               echo "Skipping $T: File not found locally after download."
               echo "::endgroup::"
               continue
             fi
 
+            for S in "${ASSETS[@]}"; do
             echo "Extracting $S..."
             if ! unsquashfs -f -d ex "$S"; then
               echo "::error::Failed to extract $S"
               E=1
-              sudo rm -rf ex "$S" download_log.txt
-              echo "::endgroup::"
+              sudo rm -rf ex "$S"
               continue
             fi
 
@@ -121,7 +121,10 @@ jobs:
               echo "Skipping $T: No executable found inside the squashfs image."
             fi
 
-            sudo rm -rf ex /c/b *.squashfs download_log.txt
+            sudo rm -rf ex /c/b "$S"
+            done
+
+            rm -f download_log.txt
             echo "::endgroup::"
           done
 
