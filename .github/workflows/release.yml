@@ -62,11 +62,14 @@ jobs:
             runner: ubuntu-latest
             zig_target: x86_64-linux-gnu.2.28
             docker_env: ""
+            scons_cmd: "scons"
+
           - arch: aarch64
             scons_arch: arm64
             runner: ubuntu-24.04-arm
             zig_target: aarch64-linux-gnu.2.28
             docker_env: "-e PYTHONHOME=/opt/python3.11"
+            scons_cmd: "/opt/python3.11/bin/scons"
 
           - type: release
             target: template_release
@@ -156,9 +159,9 @@ jobs:
             --user $(id -u):$(id -g) \
             ${{ matrix.docker_env }} \
             local-builder \
-            scons -j$(nproc) \
-            CC="/w/zig_bin/zig cc" \
-            CXX="/w/zig_bin/zig c++" \
+            ${{ matrix.scons_cmd }} -j$(nproc) \
+            CC="env ZIG_LOCAL_CACHE_DIR=/w/.zig-cache ZIG_GLOBAL_CACHE_DIR=/w/.zig-global-cache /w/zig_bin/zig cc" \
+            CXX="env ZIG_LOCAL_CACHE_DIR=/w/.zig-cache ZIG_GLOBAL_CACHE_DIR=/w/.zig-global-cache /w/zig_bin/zig c++" \
             cache_path=/w/.scons-cache \
             platform=linuxbsd \
             arch=${{ matrix.scons_arch }} \
