@@ -163,11 +163,16 @@ jobs:
           echo 'env ZIG_LOCAL_CACHE_DIR=/w/.zig-cache ZIG_GLOBAL_CACHE_DIR=/w/.zig-global-cache /w/zig_bin/zig cc "$@"' >> zig_wrappers/clang
           echo '#!/usr/bin/env bash' > zig_wrappers/clang++
           echo 'env ZIG_LOCAL_CACHE_DIR=/w/.zig-cache ZIG_GLOBAL_CACHE_DIR=/w/.zig-global-cache /w/zig_bin/zig c++ "$@"' >> zig_wrappers/clang++
-          chmod +x zig_wrappers/clang zig_wrappers/clang++
+          echo '#!/usr/bin/env bash' > zig_wrappers/ar
+          echo '/w/zig_bin/zig ar "$@"' >> zig_wrappers/ar
+          echo '#!/usr/bin/env bash' > zig_wrappers/ranlib
+          echo '/w/zig_bin/zig ranlib "$@"' >> zig_wrappers/ranlib
+          chmod +x zig_wrappers/clang zig_wrappers/clang++ zig_wrappers/ar zig_wrappers/ranlib
           docker run --rm \
             -v "$PWD":/w \
             -w /w \
             -e HOME=/tmp \
+            -e PATH="/w/zig_wrappers:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
             --user $(id -u):$(id -g) \
             ${{ matrix.docker_env }} \
             local-builder \
