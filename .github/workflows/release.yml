@@ -167,6 +167,7 @@ jobs:
           echo '/w/zig_bin/zig ar "$@"' >> zig_wrappers/ar
           echo '#!/usr/bin/env bash' > zig_wrappers/ranlib
           echo '/w/zig_bin/zig ranlib "$@"' >> zig_wrappers/ranlib
+          sed -i 's/-l:libatomic\.a//g' platform/linuxbsd/detect.py
           chmod +x zig_wrappers/clang zig_wrappers/clang++ zig_wrappers/ar zig_wrappers/ranlib
           docker run --rm \
             -v "$PWD":/w \
