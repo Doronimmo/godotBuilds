@@ -14,7 +14,6 @@ env:
     disable_path_overrides=no
     optimize=speed
     production=yes
-    lto=full
     use_static_cpp=yes
     module_openxr_enabled=no
     vulkan=no
@@ -74,19 +73,19 @@ jobs:
           - type: release
             target: template_release
             middle: ""
-            flags: ""
+            flags: "lto=full"
           - type: debug
             target: template_debug
             middle: "debug."
-            flags: ""
+            flags: "lto=thin"
           - type: mono_release
             target: template_release
             middle: "mono."
-            flags: "module_mono_enabled=yes"
+            flags: "lto=full module_mono_enabled=yes"
           - type: mono_debug
             target: template_debug
             middle: "mono.debug."
-            flags: "module_mono_enabled=yes"
+            flags: "lto=thin module_mono_enabled=yes"
               
     runs-on: ${{ matrix.runner }}
     steps:
