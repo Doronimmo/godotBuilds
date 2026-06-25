@@ -113,9 +113,6 @@ jobs:
           
           df -h
 
-      - name: Install mold linker
-        uses: rui314/setup-mold@v1
-
       - run: sudo apt-get update && sudo apt-get install -y squashfs-tools xz-utils
       
       - uses: actions/checkout@v6
@@ -183,7 +180,6 @@ jobs:
             target=${{ matrix.target }} \
             extra_cflags="-target ${{ matrix.zig_target }}" \
             extra_cxxflags="-target ${{ matrix.zig_target }}" \
-            extra_linkflags="-fuse-ld=mold" \
             ${BASE_BUILD_FLAGS} \
             ${{ matrix.flags }}
           
