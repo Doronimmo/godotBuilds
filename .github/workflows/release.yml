@@ -167,17 +167,17 @@ jobs:
             apt-get update && apt-get install -y --no-install-recommends wget gnupg ca-certificates
             
             wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
-            echo 'deb http://apt.llvm.org/buster/ llvm-toolchain-buster-11 main' >> /etc/apt/sources.list
+            echo 'deb http://apt.llvm.org/buster/ llvm-toolchain-buster-22 main' >> /etc/apt/sources.list
             apt-get update
             
             apt-get install -y --no-install-recommends \
-              build-essential pkg-config clang-11 lld-11 libx11-dev libxcursor-dev libxinerama-dev \
+              build-essential pkg-config clang-22 lld-22 libx11-dev libxcursor-dev libxinerama-dev \
               libgl1-mesa-dev libglu-dev libasound2-dev libpulse-dev libudev-dev \
               libxi-dev libxrandr-dev wayland-protocols libwayland-dev libxkbcommon-dev libwayland-bin
             
-            update-alternatives --install /usr/bin/clang clang /usr/bin/clang-11 100
-            update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-11 100
-            update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/lld-11 100
+            update-alternatives --install /usr/bin/clang clang /usr/bin/clang-22 100
+            update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-22 100
+            update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/lld-22 100
 
             if [ ! -f \"/opt/python3.11/bin/python3\" ]; then
                 apt-get install -y wget zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev libsqlite3-dev
