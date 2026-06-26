@@ -20,7 +20,7 @@ env:
     vulkan=no
     module_mobile_vr_enabled=no
     module_webxr_enabled=no
-  #safe to assume no one will miss vr/vulkan modules on PM ;]
+#safe to assume no one will miss vr/vulkan modules on PM ;]
 
 permissions:
   contents: write
@@ -49,6 +49,7 @@ jobs:
             gh workflow run "${{ github.workflow }}" -f ref="$TAG"
             sleep 2
           done
+
   build:
     if: inputs.ref != ''
     strategy:
@@ -59,10 +60,15 @@ jobs:
         include:
           - arch: x86_64
             scons_arch: x86_64
+            deb_arch: amd64
             runner: ubuntu-latest
+            scons_cmd: "scons"
+
           - arch: aarch64
             scons_arch: arm64
+            deb_arch: arm64
             runner: ubuntu-24.04-arm
+            scons_cmd: "PYTHONHOME=/opt/python3.11 /opt/python3.11/bin/scons"
 
           - type: release
             target: template_release
@@ -100,7 +106,7 @@ jobs:
           docker builder prune -af || true
           df -h
       
-      - run: sudo apt-get update && sudo apt-get install -y squashfs-tools
+      - run: sudo apt-get update && sudo apt-get install -y squashfs-tools debootstrap binfmt-support qemu-user-static
       
       - uses: actions/checkout@v6
         with:
@@ -124,31 +130,78 @@ jobs:
           restore-keys: scons-${{ matrix.arch }}-${{ matrix.type }}-
 
       - run: |
-          mkdir -p builder_repo/dotnet
-          if [[ "${{ matrix.type }}" == mono_* ]]; then
-            cp -R "$DOTNET_ROOT"/* builder_repo/dotnet/
+          sudo debootstrap --arch=${{ matrix.deb_arch }} buster /mnt/buster http://deb.debian.org/debian/
+          
+          for dir in dev dev/pts proc sys; do
+            sudo mount -o bind /$dir /mnt/buster/$dir
+          done
+          
+          sudo mkdir -p /mnt/buster/w
+          sudo mount -o bind $PWD/godot_source /mnt/buster/w
+          
+          if [ -d "builder_repo/deps" ]; then
+            sudo mkdir -p /mnt/buster/tmp/deps
+            sudo cp -R builder_repo/deps/. /mnt/buster/tmp/deps/
           fi
-          touch builder_repo/dotnet/.gitkeep
-          
-      - run: docker build --build-arg ARCH=${{ matrix.arch }} -f builder_repo/.github/Dockerfile -t local-builder builder_repo
-      
+
+          if [[ "${{ matrix.type }}" == mono_* ]]; then
+            sudo mkdir -p /mnt/buster/usr/share/dotnet
+            sudo mount -o bind "$DOTNET_ROOT" /mnt/buster/usr/share/dotnet
+          fi
+
       - run: |
-          cd godot_source
-          docker run --rm \
-            -v "$PWD":/w \
-            -w /w \
-            -e HOME=/tmp \
-            --user $(id -u):$(id -g) \
-            local-builder \
-            scons -j$(nproc) \
-            cache_path=/w/.scons-cache \
-            platform=linuxbsd \
-            arch=${{ matrix.scons_arch }} \
-            target=${{ matrix.target }} \
-            ${BASE_BUILD_FLAGS} \
-            ${{ matrix.flags }}
+          sudo chroot /mnt/buster /bin/bash -c "
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            
+            apt-get install -y --no-install-recommends \
+              build-essential pkg-config libx11-dev libxcursor-dev libxinerama-dev \
+              libgl1-mesa-dev libglu-dev libasound2-dev libpulse-dev libudev-dev \
+              libxi-dev libxrandr-dev wayland-protocols libwayland-dev libxkbcommon-dev libwayland-bin
+            
+            if [ \"${{ matrix.arch }}\" = \"aarch64\" ]; then
+                mv /tmp/deps/python3.11 /opt/python3.11 \
+                && rm -f /opt/python3.11/pyvenv.cfg \
+                && PYTHONHOME=/opt/python3.11 /opt/python3.11/bin/python3 -m ensurepip --upgrade \
+                && PYTHONHOME=/opt/python3.11 /opt/python3.11/bin/python3 -m pip install --upgrade pip \
+                && (PYTHONHOME=/opt/python3.11 /opt/python3.11/bin/python3 -m pip install --break-system-packages scons \
+                    || PYTHONHOME=/opt/python3.11 /opt/python3.11/bin/python3 -m pip install scons); \
+            else \
+                apt-get update && apt-get install -y software-properties-common && add-apt-repository ppa:deadsnakes/ppa -y \
+                && apt-get update && apt-get install -y python3.11 python3.11-venv python3.11-distutils \
+                && python3.11 -m ensurepip --upgrade \
+                && (python3.11 -m pip install --break-system-packages scons || python3.11 -m pip install scons); \
+            fi \
+            && rm -rf /tmp/deps
+          "
+
+      - run: |
+          sudo chroot /mnt/buster /bin/bash -c "
+            cd /w
+            
+            if [[ \"${{ matrix.type }}\" == mono_* ]]; then
+              export DOTNET_ROOT=/usr/share/dotnet
+              export PATH=\"/usr/share/dotnet:/root/.local/bin:\${PATH}\"
+            fi
+            
+            if [ \"${{ matrix.arch }}\" = \"aarch64\" ]; then
+              export PYTHONHOME=/opt/python3.11
+            fi
+            
+            ${{ matrix.scons_cmd }} -j$(nproc) \
+              cache_path=/w/.scons-cache \
+              platform=linuxbsd \
+              arch=${{ matrix.scons_arch }} \
+              target=${{ matrix.target }} \
+              ${BASE_BUILD_FLAGS} \
+              ${{ matrix.flags }}
+          "
+
+      - run: |
+          sudo chown -R $USER:$USER godot_source/bin
+          sudo chown -R $USER:$USER godot_source/.scons-cache
           
-          cd bin
+          cd godot_source/bin
           VERSION="${{ inputs.ref }}"
           VERSION="${VERSION%-stable}"
           SHORTVER="${VERSION//./}"
@@ -158,9 +211,11 @@ jobs:
           BIN_NAME="godot${SHORTVER}.${{ matrix.middle }}${SUFFIX}"
           ORIG_BIN=$(ls godot.linuxbsd.${{ matrix.target }}.${{ matrix.scons_arch }}*)
           
-          strip "$ORIG_BIN" \
-            && mv "$ORIG_BIN" "$BIN_NAME" \
-            && chmod 777 "$BIN_NAME"
+          if [[ "${{ matrix.type }}" == *debug ]]; then
+              strip "$ORIG_BIN"
+          fi
+          mv "$ORIG_BIN" "$BIN_NAME"
+          chmod 777 "$BIN_NAME"
           
           mksquashfs "$BIN_NAME" \
             "godot_${VERSION}.${{ matrix.middle }}${SUFFIX}.squashfs" \
