@@ -106,7 +106,7 @@ jobs:
           docker builder prune -af || true
           df -h
       
-      - run: sudo apt-get update && sudo apt-get install -y squashfs-tools debootstrap binfmt-support qemu-user-static
+      - run: sudo apt-get update && sudo apt-get install -y squashfs-tools debootstrap binfmt-support qemu-user-static debian-archive-keyring ubuntu-keyring
       
       - uses: actions/checkout@v6
         with:
@@ -130,7 +130,7 @@ jobs:
           restore-keys: scons-${{ matrix.arch }}-${{ matrix.type }}-
 
       - run: |
-          sudo debootstrap --arch=${{ matrix.deb_arch }} buster /mnt/buster http://deb.debian.org/debian/
+          sudo debootstrap --no-check-gpg --arch=${{ matrix.deb_arch }} buster /mnt/buster http://archive.debian.org/debian/
           
           for dir in dev dev/pts proc sys; do
             sudo mount -o bind /$dir /mnt/buster/$dir
