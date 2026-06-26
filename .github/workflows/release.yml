@@ -16,6 +16,8 @@ env:
     production=yes
     lto=full
     use_static_cpp=yes
+    use_llvm=yes
+    linker=lld
     module_openxr_enabled=no
     vulkan=no
     module_mobile_vr_enabled=no
@@ -165,7 +167,7 @@ jobs:
             apt-get update
             
             apt-get install -y --no-install-recommends \
-              build-essential pkg-config libx11-dev libxcursor-dev libxinerama-dev \
+              build-essential clang lld pkg-config libx11-dev libxcursor-dev libxinerama-dev \
               libgl1-mesa-dev libglu-dev libasound2-dev libpulse-dev libudev-dev \
               libxi-dev libxrandr-dev wayland-protocols libwayland-dev libxkbcommon-dev libwayland-bin
             
