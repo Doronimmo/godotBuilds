@@ -177,7 +177,7 @@ jobs:
             --user $(id -u):$(id -g) \
             ${{ matrix.docker_env }} \
             local-builder \
-            ${{ matrix.scons_cmd }} -j$(nproc) \
+            ${{ matrix.scons_cmd }} -j2 \
             CC="/w/zig_wrappers/clang" \
             CXX="/w/zig_wrappers/clang++" \
             cache_path=/w/.scons-cache \
