@@ -175,6 +175,10 @@ jobs:
               libgl1-mesa-dev libglu-dev libasound2-dev libpulse-dev libudev-dev \
               libxi-dev libxrandr-dev wayland-protocols libwayland-dev libxkbcommon-dev libwayland-bin
             
+            update-alternatives --install /usr/bin/clang clang /usr/bin/clang-11 100
+            update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-11 100
+            update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/lld-11 100
+
             if [ ! -f \"/opt/python3.11/bin/python3\" ]; then
                 apt-get install -y wget zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev libsqlite3-dev
                 wget https://www.python.org/ftp/python/3.11.9/Python-3.11.9.tgz
@@ -211,9 +215,6 @@ jobs:
             export PYTHONHOME=/opt/python3.11
             
             PYTHONHOME=/opt/python3.11 /opt/python3.11/bin/scons -j$(nproc) \
-              CC=clang-11 \
-              CXX=clang++-11 \
-              linker=lld-11 \
               cache_path=/w/.scons-cache \
               platform=linuxbsd \
               arch=${{ matrix.scons_arch }} \
