@@ -173,7 +173,7 @@ jobs:
             apt-get install -y --no-install-recommends \
               build-essential pkg-config clang-22 lld-22 libx11-dev libxcursor-dev libxinerama-dev \
               libgl1-mesa-dev libglu-dev libasound2-dev libpulse-dev libudev-dev \
-              libxi-dev libxrandr-dev wayland-protocols libwayland-dev libxkbcommon-dev libwayland-bin
+              libxi-dev libxrandr-dev wayland-protocols libwayland-dev libxkbcommon-dev libwayland-bin build essential
             
             update-alternatives --install /usr/bin/clang clang /usr/bin/clang-22 100
             update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-22 100
