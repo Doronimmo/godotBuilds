@@ -164,10 +164,14 @@ jobs:
       - run: |
           sudo chroot /mnt/buster /bin/bash -c "
             export DEBIAN_FRONTEND=noninteractive
+            apt-get update && apt-get install -y --no-install-recommends wget gnupg ca-certificates
+            
+            wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
+            echo 'deb http://apt.llvm.org/buster/ llvm-toolchain-buster-11 main' >> /etc/apt/sources.list
             apt-get update
             
             apt-get install -y --no-install-recommends \
-              build-essential clang lld pkg-config libx11-dev libxcursor-dev libxinerama-dev \
+              build-essential pkg-config clang-11 lld-11 libx11-dev libxcursor-dev libxinerama-dev \
               libgl1-mesa-dev libglu-dev libasound2-dev libpulse-dev libudev-dev \
               libxi-dev libxrandr-dev wayland-protocols libwayland-dev libxkbcommon-dev libwayland-bin
             
@@ -207,6 +211,9 @@ jobs:
             export PYTHONHOME=/opt/python3.11
             
             PYTHONHOME=/opt/python3.11 /opt/python3.11/bin/scons -j$(nproc) \
+              CC=clang-11 \
+              CXX=clang++-11 \
+              linker=lld-11 \
               cache_path=/w/.scons-cache \
               platform=linuxbsd \
               arch=${{ matrix.scons_arch }} \
